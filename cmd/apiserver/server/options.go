@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -89,6 +90,15 @@ func (o *CalicoServerOptions) Config() (*apiserver.Config, error) {
 	}
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
+	r := serverConfig.RESTOptionsGetter
+	fmt.Printf("song: server config RESTOptionsGetter: %v\n", r)
+	if r != nil {
+		switch t := r.(type) {
+		default:
+			var r = reflect.TypeOf(t)
+			fmt.Printf("song real type:%v\n", r)
+		}
+	}
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, k8sopenapi.NewDefinitionNamer(apiserver.Scheme))
 	if serverConfig.OpenAPIConfig.Info == nil {
 		serverConfig.OpenAPIConfig.Info = &spec.Info{}
@@ -162,6 +172,7 @@ func (o *CalicoServerOptions) Config() (*apiserver.Config, error) {
 		logrusLevel = logutils.SafeParseLogLevel(env)
 	}
 	logrus.SetLevel(logrusLevel)
+	logrus.Infof("song: test version 0")
 
 	minResourceRefreshInterval := 5 * time.Second
 	if env := os.Getenv("MIN_RESOURCE_REFRESH_INTERVAL"); env != "" {
