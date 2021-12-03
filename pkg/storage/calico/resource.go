@@ -362,6 +362,7 @@ func (rs *resourceStore) GuaranteedUpdate(
 	ctx context.Context, key string, out runtime.Object, ignoreNotFound bool,
 	precondtions *storage.Preconditions, userUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
 	// If a cachedExistingObject was passed, use that as the initial object, otherwise use Get() to retrieve it
+	klog.Infof("Song get called with key: %v on resource %v, cached %v\n", key, rs.resourceName, cachedExistingObject)
 	var initObj runtime.Object
 	if cachedExistingObject != nil {
 		initObj = cachedExistingObject
@@ -369,16 +370,18 @@ func (rs *resourceStore) GuaranteedUpdate(
 		initObj = reflect.New(rs.aapiType).Interface().(runtime.Object)
 		opts := storage.GetOptions{IgnoreNotFound: ignoreNotFound}
 		if err := rs.Get(ctx, key, opts, initObj); err != nil {
-			klog.Errorf("getting initial object (%s)", err)
-			return aapiError(err, key)
+			klog.Errorf("song getting initial object (%s)", err)
+			// return aapiError(err, key)
 		}
 	}
+	klog.Infof("step 1 Get called with key: %v on resource %v\n", key, rs.resourceName)
 	// In either case, extract current state from the initial object
 	curState, err := rs.getStateFromObject(initObj)
 	if err != nil {
 		klog.Errorf("getting state from initial object (%s)", err)
 		return err
 	}
+	klog.Infof("step 2 Get called with key: %v on resource %v, curState %v\n", key, rs.resourceName, curState)
 
 	// Loop until update succeeds or we get an error
 	// Check count to avoid an infinite loop in case of any issues
@@ -390,6 +393,7 @@ func (rs *resourceStore) GuaranteedUpdate(
 			klog.Errorf("checking preconditions (%s)", err)
 			return err
 		}
+		klog.Infof("step 3 Get called with key: %v on resource %v\n", key, rs.resourceName)
 		// update the object by applying the userUpdate func & encode it
 		updatedObj, ttl, err := userUpdate(curState.obj, *curState.meta)
 		if err != nil {
@@ -397,11 +401,14 @@ func (rs *resourceStore) GuaranteedUpdate(
 			return err
 		}
 
+		klog.Infof("step 4 Get called with key: %v on resource %v, obj %v\n", key, rs.resourceName, updatedObj)
+
 		updatedData, err := runtime.Encode(rs.codec, updatedObj)
 		if err != nil {
 			klog.Errorf("encoding candidate obj (%s)", err)
 			return err
 		}
+		klog.Infof("step 5 Get called with key: %v on resource %v\n", key, rs.resourceName)
 
 		// figure out what the new "current state" of the object is for this loop iteration
 		if bytes.Equal(updatedData, curState.data) {
@@ -409,7 +416,7 @@ func (rs *resourceStore) GuaranteedUpdate(
 			// decode into the out object
 			return decode(rs.codec, updatedData, out)
 		}
-
+		klog.Infof("step 6 Get called with key: %v on resource %v\n", key, rs.resourceName)
 		// Apply Update
 		// Check for Revision no. If not set or less than the current version then set it
 		// to latest
@@ -420,15 +427,31 @@ func (rs *resourceStore) GuaranteedUpdate(
 		revInt, _ := strconv.Atoi(accessor.GetResourceVersion())
 		updatedRes := updatedObj.(resourceObject)
 		if updatedRes.GetObjectMeta().GetResourceVersion() == "" || revInt < int(curState.rev) {
-			updatedRes.(resourceObject).GetObjectMeta().SetResourceVersion(strconv.FormatInt(curState.rev, 10))
+			if curState.rev != 0 {
+				updatedRes.(resourceObject).GetObjectMeta().SetResourceVersion(strconv.FormatInt(curState.rev, 10))
+			}
 		}
 		libcalicoObj := rs.converter.convertToLibcalico(updatedRes)
+
+		if curState.rev == 0 {
+			// when we reach here, we know it is a server-side apply or updateStatedy allows create on update.
+			createdLibcalicoObj, err := rs.create(ctx, rs.client, libcalicoObj, options.SetOptions{})
+			klog.Infof("step 7 Get called with key: %v on resource %v, obj %v, err %v\n",
+				key, rs.resourceName, createdLibcalicoObj, err)
+			if err != nil {
+				klog.Errorf("creating new object (%s) on PATCH", err)
+				return err
+			}
+			rs.converter.convertToAAPI(createdLibcalicoObj, out)
+			return nil
+		}
 
 		var opts options.SetOptions
 		if ttl != nil {
 			opts = options.SetOptions{TTL: time.Duration(*ttl) * time.Second}
 		}
 		createdLibcalicoObj, err := rs.update(ctx, rs.client, libcalicoObj, opts)
+		klog.Infof("step 8 Get called with key: %v on resource %v, err %v\n", key, rs.resourceName, err)
 		if err != nil {
 			switch err.(type) {
 			case errors.ErrorValidation:

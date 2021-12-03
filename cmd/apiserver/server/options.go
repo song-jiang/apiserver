@@ -172,7 +172,7 @@ func (o *CalicoServerOptions) Config() (*apiserver.Config, error) {
 		logrusLevel = logutils.SafeParseLogLevel(env)
 	}
 	logrus.SetLevel(logrusLevel)
-	logrus.Infof("song: test version 0")
+	logrus.Infof("song: test version 8")
 
 	minResourceRefreshInterval := 5 * time.Second
 	if env := os.Getenv("MIN_RESOURCE_REFRESH_INTERVAL"); env != "" {

@@ -25,7 +25,7 @@ replace (
 	k8s.io/api => k8s.io/api v0.21.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.21.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.21.0
-	k8s.io/apiserver => k8s.io/apiserver v0.21.0
+	k8s.io/apiserver => github.com/song-jiang/apiserver-1 v0.21.1-0.20211203165637-b36f326ffc3b
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.21.0
 	k8s.io/client-go => k8s.io/client-go v0.21.0
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.21.0
